@@ -1,28 +1,97 @@
 'use strict';
 
+// User chooses number of questions >> add amount options
+// User chooses only one category >> add category options
+// Only multiple choice questions
+// Set new query
+// Send a request to trivia api to fetch questions
+// Generate quiz with fetched questions
+
+const BASE_URL = 'https://opentdb.com';
+const MAIN_PATH = '/api.php';
+const TOKEN_PATH = '/api_token.php';
+const CAT_PATH = '/api_category.php';
+let token = '';
+let amountOfQuestions = 0;
+let category = 9;
+
+// Build endpoint URL
+function buildBASEUrl() {
+  return BASE_URL + MAIN_PATH;
+}
+
+function buildTokenUrl() {
+  return BASE_URL + TOKEN_PATH;
+}
+
+
+// Where do I call these functions?
+// Before DOM loads or after?
+
+
+// Fetch data
+function fetchToken() {
+  $.getJSON(buildTokenUrl(), {command: 'request'}, response => {
+    token = response.token;
+    console.log(`session token fetched: ${token}`);
+  });
+}
+
+function fetchQuestions() {
+  const query = {
+    category: category,
+    amount: amountOfQuestions,
+    token: token,
+    type: 'multiple'
+  };
+  console.log(query);
+  $.getJSON(buildBASEUrl(), query, response => {
+    console.log('questions fetched:', response.results);
+    let decoratedQuestions = decorateQuestions(response.results);
+    console.log(decoratedQuestions);
+    addQuestions(decoratedQuestions);
+    console.log(QUESTIONS);
+  });
+}
+
+
+function fetchCategory() {
+
+}
+
+// Decorate responses
+function decorateQuestions(data) {
+  const randomAnswers = [...data[0].incorrect_answers];
+  const randomIndex = Math.floor(Math.random() * (data[0].incorrect_answers.length + 1));
+  randomAnswers.splice(randomIndex, 0, data[0].correct_answer);
+  return {
+    text: data[0].question,
+    answers: randomAnswers,
+    correctAnswer: data[0].correct_answer,
+  };
+}
+
+// Add questions to store
+function addQuestions(decoratedQuestions) {
+  QUESTIONS.push(decoratedQuestions);
+}
+
+
+
 const TOP_LEVEL_COMPONENTS = [
   'js-intro', 'js-question', 'js-question-feedback', 'js-outro', 'js-quiz-status'
 ];
 
-const QUESTIONS = [
-  {
-    text: 'Capital of England?',
-    answers: ['London', 'Paris', 'Rome', 'Washington DC'],
-    correctAnswer: 'London'
-  },
-  {
-    text: 'How many kilometers in one mile?',
-    answers: ['0.6', '1.2', '1.6', '1.8'],
-    correctAnswer: '1.6'
-  }
-];
+const QUESTIONS = [];
 
 const getInitialStore = function() {
   return {
     page: 'intro',
     currentQuestionIndex: null,
     userAnswers: [],
-    feedback: null
+    feedback: null,
+    userAmount: null,
+    userCategory: null,
   };
 };
 
@@ -109,31 +178,31 @@ const render = function() {
   $('.js-progress').html(`<span>Question ${current} of ${total}`);
 
   switch (store.page) {
-    case 'intro':
-      $('.js-intro').show();
-      break;
+  case 'intro':
+    $('.js-intro').show();
+    break;
 
-    case 'question':
-      html = generateQuestionHtml(question);
-      $('.js-question').html(html);
-      $('.js-question').show();
-      $('.quiz-status').show();
-      break;
+  case 'question':
+    html = generateQuestionHtml(question);
+    $('.js-question').html(html);
+    $('.js-question').show();
+    $('.quiz-status').show();
+    break;
 
-    case 'answer':
-      html = generateFeedbackHtml(feedback);
-      $('.js-question-feedback').html(html);
-      $('.js-question-feedback').show();
-      $('.quiz-status').show();
-      break;
+  case 'answer':
+    html = generateFeedbackHtml(feedback);
+    $('.js-question-feedback').html(html);
+    $('.js-question-feedback').show();
+    $('.quiz-status').show();
+    break;
 
-    case 'outro':
-      $('.js-outro').show();
-      $('.quiz-status').show();
-      break;
+  case 'outro':
+    $('.js-outro').show();
+    $('.quiz-status').show();
+    break;
 
-    default:
-      return;
+  default:
+    return;
   }
 };
 
@@ -143,6 +212,8 @@ const handleStartQuiz = function() {
   store = getInitialStore();
   store.page = 'question';
   store.currentQuestionIndex = 0;
+  amountOfQuestions = parseInt($('#qId option:selected').val());
+  fetchQuestions();
   render();
 };
 
@@ -174,10 +245,15 @@ const handleNextQuestion = function() {
   render();
 };
 
+
+fetchToken();
+
 // On DOM Ready, run render() and add event listeners
 $(() => {
   render();
+  $('.js-start').attr('disabled', 'disabled');
 
+  // $('.js-intro').on('click', '.js-start', fetchQuestions);
   $('.js-intro, .js-outro').on('click', '.js-start', handleStartQuiz);
   $('.js-question').on('submit', handleSubmitAnswer);
   $('.js-question-feedback').on('click', '.js-continue', handleNextQuestion);
